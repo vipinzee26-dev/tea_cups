@@ -130,6 +130,7 @@ export default function App() {
   // load entries when month/year/vendor change
   useEffect(() => {
     if (!selectedVendor) return
+    setEntries(new Map())
     const cur = ++loadId.current
     setLoading(true)
     fetchEntriesForMonth(year, month, selectedVendor.id)
@@ -639,10 +640,11 @@ export default function App() {
                                 inputMode="numeric"
                                 min={0}
                                 max={999}
+                                disabled={loading}
                                 value={q === 0 ? '' : q}
                                 placeholder="0"
                                 onChange={(e) => handleQtyChange(date, it.id, e.target.value)}
-                                className="w-[72px] h-9 text-center rounded-xl border border-slate-200 bg-white font-semibold focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-300 placeholder:text-slate-300"
+                                className="w-[72px] h-9 text-center rounded-xl border border-slate-200 bg-white font-semibold focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-300 placeholder:text-slate-300 disabled:opacity-50 disabled:bg-slate-50"
                               />
                             </div>
                           </td>
