@@ -117,8 +117,6 @@ export default function App() {
       } catch (e) {
         console.error(e)
         showToast('Failed to load vendors')
-      } finally {
-        if (!cancelled) setLoading(false)
       }
     }
     loadVendors()
@@ -138,9 +136,9 @@ export default function App() {
         if (cur !== loadId.current) return
         setEntries(map)
       })
-      .catch((e) => {
+      .catch((e: any) => {
         console.error(e)
-        showToast('Failed to load entries')
+        showToast(`Failed to load entries: ${e.message || e}`)
       })
       .finally(() => {
         if (cur === loadId.current) setLoading(false)
@@ -149,12 +147,15 @@ export default function App() {
 
   // autosave debounce map
   const saveTimers = useRef<Map<string, number>>(new Map())
+  const pendingEntries = useRef<Map<string, DailyEntry>>(new Map())
 
   const persistEntry = useCallback(
     async (entry: DailyEntry) => {
+      const key = `${entry.vendorId}_${entry.date}`
       setSavingKey(entry.date)
       try {
         await saveDailyEntry({ ...entry, updatedAt: new Date().toISOString() })
+        pendingEntries.current.delete(key)
       } catch (e) {
         console.error(e)
         showToast('Save failed')
@@ -164,6 +165,30 @@ export default function App() {
     },
     [showToast]
   )
+
+  const flushPendingSaves = useCallback(async () => {
+    for (const [, timer] of saveTimers.current.entries()) {
+      window.clearTimeout(timer)
+    }
+    saveTimers.current.clear()
+
+    const toFlush = Array.from(pendingEntries.current.values())
+    pendingEntries.current.clear()
+
+    if (toFlush.length) {
+      await Promise.all(
+        toFlush.map((e) =>
+          saveDailyEntry({ ...e, updatedAt: new Date().toISOString() }).catch(console.error)
+        )
+      )
+    }
+  }, [])
+
+  const handleSelectVendor = async (vendorId: string) => {
+    if (vendorId === selectedVendorId) return
+    await flushPendingSaves()
+    setSelectedVendorId(vendorId)
+  }
 
   const handleQtyChange = (date: string, itemId: string, qtyStr: string) => {
     if (!selectedVendor) return
@@ -177,7 +202,10 @@ export default function App() {
 
     setEntries((prev) => {
       const next = new Map(prev)
-      const existing = next.get(date)
+      const rawExisting = next.get(date)
+      // Guard against cross-vendor data contamination
+      const existing = rawExisting && rawExisting.vendorId === selectedVendor.id ? rawExisting : undefined
+
       // create base items map from vendor active items + preserve existing
       const baseItems: DailyEntry['items'] = {}
       for (const vi of selectedVendor.items.filter((i) => i.isActive)) {
@@ -209,11 +237,13 @@ export default function App() {
       }
       next.set(date, entry)
 
-      // debounce persist
-      const prevTimer = saveTimers.current.get(date)
+      // debounce persist keyed by vendorId and date to prevent collisions
+      const timerKey = `${selectedVendor.id}_${date}`
+      const prevTimer = saveTimers.current.get(timerKey)
       if (prevTimer) window.clearTimeout(prevTimer)
+      pendingEntries.current.set(timerKey, entry)
       const t = window.setTimeout(() => persistEntry(entry), 450)
-      saveTimers.current.set(date, t)
+      saveTimers.current.set(timerKey, t)
 
       return next
     })
@@ -481,7 +511,7 @@ export default function App() {
             {vendors.map((v) => (
               <button
                 key={v.id}
-                onClick={() => setSelectedVendorId(v.id)}
+                onClick={() => handleSelectVendor(v.id)}
                 className={`px-4 py-2 rounded-lg text-sm font-semibold transition flex items-center gap-2 ${
                   selectedVendorId === v.id
                     ? 'bg-white shadow-sm border border-slate-200 text-slate-900'

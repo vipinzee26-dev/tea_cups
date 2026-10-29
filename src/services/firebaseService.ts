@@ -109,7 +109,9 @@ export async function fetchEntriesForMonth(
   const out = new Map<string, DailyEntry>()
   for (const d of snap.docs) {
     const e = d.data() as DailyEntry
-    if (e.date.startsWith(prefix)) out.set(e.date, e)
+    if (e.date && typeof e.date === 'string' && e.date.startsWith(prefix)) {
+      out.set(e.date, e)
+    }
   }
   return out
 }

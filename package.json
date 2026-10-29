@@ -8,6 +8,7 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
+    "test": "node scripts/comprehensive_test.mjs",
     "seed": "node scripts/seed.mjs",
     "seed:august": "node scripts/seedAugust.mjs",
     "verify": "node scripts/verify.mjs"
